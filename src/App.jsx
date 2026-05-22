@@ -81,7 +81,7 @@ export default function App() {
           geram economia de verdade?
         </h1>
 
-        <button className="cta">
+        <button className="cta" onClick={handleWhatsappClick}>
           QUERO CONHECER O PLANO
         </button>
       </section>
@@ -101,12 +101,25 @@ export default function App() {
       {/* SEÇÃO - 2 PLANO + COMPARAÇÃO */}
       <section className="plan">
 
-        <h2 className="plan-title">CONTRATE O PLANO FAMÍLIA</h2>
+        <div className="plan-heading">
+          <span className="plan-kicker">Plano completo para sua casa</span>
+          <h2 className="plan-title">CONTRATE O PLANO FAMÍLIA</h2>
+          <p>
+            Internet de alta velocidade, apps inclusos e suporte premium em uma
+            oferta simples para a rotina da família.
+          </p>
+        </div>
 
         <div className="plan-content">
 
           {/* TEXTO */}
           <div className="plan-left">
+            <div className="speed-card">
+              <span>Velocidade principal</span>
+              <strong>700 MEGAS</strong>
+              <p>Para streaming, jogos, trabalho remoto e vários dispositivos.</p>
+            </div>
+
             <p className="paragrafo">
               Alta velocidade para navegação, streaming de vídeo e música
               e trabalhos pesados.
@@ -114,9 +127,7 @@ export default function App() {
 
             <h4>ASSINATURA INCLUSA</h4>
             {/* LINHA COM LOGO */}
-            <div className="logo-line">
-              <span className="line"></span>
-
+            <div className="logo-line apps-grid">
               <div className="logo-item">
                 <img src={ubook} alt="Logo ubook" className="logo-line-image" />
                 <span className="subtitle">Ubook</span>
@@ -136,38 +147,23 @@ export default function App() {
                 <img src={prime} alt="Logo prime" className="logo-line-image" />
                 <span className="subtitle">Prime</span>
               </div>
-
-              {/* <div className="logo-item">
-                <img src={disney} alt="Logo disney" className="logo-line-image" />
-                <span className="subtitle">Disney+</span>
-              </div> */}
-
-              <span className="line"></span>
-
             </div>
-            <div className="logo-line">
-              
-            <div className="logo-item-bonos">
-                  <IoAdd 
-                    size={40} 
-                    color="red"
-                    style={{
-                      color: "red",
-                      filter: "drop-shadow(0 0 3px red)"
-                    }}
-                    />
+
+            <div className="bonus-card">
+              <div className="bonus-icon">
+                <IoAdd />
+              </div>
               <div className="logo-item">
                   <img src={disney} alt="Logo disney" className="logo-line-image" />
               </div>
               <p>BÔNUS DE 3 MESES DE DISNEY+ SEM CUSTO ADICIONAL.</p>
-              </div>
             </div>
-            
 
           </div>
 
           {/* BENEFÍCIOS */}
           <div className="plan-right">
+            <span className="included-label">Também incluso</span>
             <ul>
               <li> <IoAdd /> 700 MEGAS</li>
               <li> <IoAdd /> ROTEADOR EM COMODATO</li>
@@ -179,7 +175,10 @@ export default function App() {
         </div>
 
         {/* COMPARAÇÃO */}
-        <h2 className="compare-title">COMPARE</h2>
+        <div className="compare-heading">
+          <span>Compare e veja a economia</span>
+          <h2 className="compare-title">QUEM COMPARA, ASSINA NETBOX</h2>
+        </div>
 
         <div className="compare">
 
@@ -216,6 +215,7 @@ export default function App() {
           </div>
 
           <div className="compare-right">
+            <span className="best-choice">Melhor escolha</span>
             <h4>PLANO FAMÍLIA NETBOX</h4>
 
             <ul className="lista-plonos">
@@ -228,6 +228,7 @@ export default function App() {
             <div className="price-box">
               <span>Aproveite essa oferta!</span>
               <h3>R$ 134,90/mês</h3>
+              <p>Economia de R$ 102,60 por mês comparando com os serviços avulsos.</p>
 
               <button onClick={handleWhatsappClick}>ASSINAR PELO WHATSAPP</button>
             </div>

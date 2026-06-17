@@ -1,3 +1,5 @@
+import { useRef, useState } from "react";
+
 import "./App.css";
 
 import logo from "../public/LOGO-NETBOX.png"; // sua logo aqui
@@ -9,14 +11,29 @@ import disney from "../public/imgs/disney-plus.png";
 
 import capas from "../public/logos/image.png"; // logos dos apps aqui 
 import { IoAdd, IoLogoWhatsapp } from "react-icons/io5";
+
+const PLAN_NAME = "Plano Familia Netbox";
+const emptyLeadForm = {
+  name: "",
+  phone: "",
+  city: "",
+};
+
 export default function App() {
+  const [isLeadFormOpen, setIsLeadFormOpen] = useState(false);
+  const [leadForm, setLeadForm] = useState(emptyLeadForm);
+  const [leadError, setLeadError] = useState("");
+  const nameInputRef = useRef(null);
+
   const apiBaseUrl =
     import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
   const whatsappNumber = String(
     import.meta.env.VITE_WHATSAPP_NUMBER || ""
   ).replace(/\D/g, "");
   const whatsappFallbackUrl = whatsappNumber
-    ? `https://wa.me/${whatsappNumber}?text=Tenho%20interesse%20no%20Plano%20Familia%20Netbox.`
+    ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
+        `Tenho interesse no ${PLAN_NAME}.`
+      )}`
     : "";
 
   function getReferralCode() {
@@ -34,16 +51,84 @@ export default function App() {
     return sessionStorage.getItem("netboxReferralCode");
   }
 
-  function handleWhatsappClick() {
+  function openLeadForm() {
+    setLeadError("");
+    setIsLeadFormOpen(true);
+    window.setTimeout(() => nameInputRef.current?.focus(), 0);
+  }
+
+  function closeLeadForm() {
+    setIsLeadFormOpen(false);
+    setLeadError("");
+  }
+
+  function handleLeadFieldChange(event) {
+    const { name, value } = event.target;
+
+    setLeadForm((currentLeadForm) => ({
+      ...currentLeadForm,
+      [name]: value,
+    }));
+  }
+
+  function buildWhatsappFallbackUrl(leadValues) {
+    if (!whatsappNumber) {
+      return "";
+    }
+
+    const message = leadValues
+      ? [
+          `Tenho interesse no ${PLAN_NAME}.`,
+          `Nome: ${leadValues.name}`,
+          `WhatsApp: ${leadValues.phone}`,
+          `Cidade: ${leadValues.city}`,
+        ].join("\n")
+      : `Tenho interesse no ${PLAN_NAME}.`;
+
+    return `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
+      message
+    )}`;
+  }
+
+  function handleLeadSubmit(event) {
+    event.preventDefault();
+
+    const nextLeadForm = {
+      name: leadForm.name.trim(),
+      phone: leadForm.phone.replace(/\D/g, ""),
+      city: leadForm.city.trim(),
+    };
+
+    if (
+      !nextLeadForm.name ||
+      nextLeadForm.phone.length < 10 ||
+      !nextLeadForm.city
+    ) {
+      setLeadError("Preencha nome, WhatsApp e cidade para continuar.");
+      return;
+    }
+
+    handleWhatsappClick(nextLeadForm);
+  }
+
+  function handleOverlayClick(event) {
+    if (event.target === event.currentTarget) {
+      closeLeadForm();
+    }
+  }
+
+  function handleWhatsappClick(leadValues) {
     const referralCode = getReferralCode();
 
     if (!referralCode) {
-      if (!whatsappFallbackUrl) {
+      const fallbackUrl = buildWhatsappFallbackUrl(leadValues);
+
+      if (!fallbackUrl && !whatsappFallbackUrl) {
         alert("Link de divulgação não identificado.");
         return;
       }
 
-      window.location.href = whatsappFallbackUrl;
+      window.location.href = fallbackUrl || whatsappFallbackUrl;
       return;
     }
 
@@ -51,7 +136,14 @@ export default function App() {
       `/links/${referralCode}/whatsapp`,
       apiBaseUrl
     );
-    url.searchParams.set("product", "Plano Familia Netbox");
+    url.searchParams.set("product", PLAN_NAME);
+
+    if (leadValues) {
+      url.searchParams.set("visitorName", leadValues.name);
+      url.searchParams.set("visitorPhone", leadValues.phone);
+      url.searchParams.set("visitorCity", leadValues.city);
+      url.searchParams.set("source", "landing-page");
+    }
 
     window.location.href = url.toString();
   }
@@ -81,10 +173,82 @@ export default function App() {
           geram economia de verdade?
         </h1>
 
-        <button className="cta" onClick={handleWhatsappClick}>
+        <button className="cta" onClick={openLeadForm}>
           QUERO CONHECER O PLANO
         </button>
       </section>
+
+      {isLeadFormOpen && (
+        <div
+          className="lead-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="lead-form-title"
+          onClick={handleOverlayClick}
+        >
+          <div className="lead-form-card">
+            <button
+              className="lead-close"
+              type="button"
+              aria-label="Fechar formulario"
+              onClick={closeLeadForm}
+            >
+              X
+            </button>
+
+            <span className="lead-kicker">Plano Familia Netbox</span>
+            <h2 id="lead-form-title">Quero conhecer o plano</h2>
+
+            <form className="lead-form" onSubmit={handleLeadSubmit}>
+              <label>
+                Nome completo
+                <input
+                  ref={nameInputRef}
+                  type="text"
+                  name="name"
+                  autoComplete="name"
+                  value={leadForm.name}
+                  onChange={handleLeadFieldChange}
+                />
+              </label>
+
+              <label>
+                WhatsApp
+                <input
+                  type="tel"
+                  name="phone"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder="(63) 99999-9999"
+                  value={leadForm.phone}
+                  onChange={handleLeadFieldChange}
+                />
+              </label>
+
+              <label>
+                Cidade
+                <input
+                  type="text"
+                  name="city"
+                  autoComplete="address-level2"
+                  value={leadForm.city}
+                  onChange={handleLeadFieldChange}
+                />
+              </label>
+
+              {leadError && (
+                <p className="lead-error" role="alert">
+                  {leadError}
+                </p>
+              )}
+
+              <button className="lead-submit" type="submit">
+                <IoLogoWhatsapp /> ENVIAR E CONTINUAR
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* SEÇÃO - 1 POR QUE ESCOLHER */}
       <section className="why">
@@ -230,7 +394,7 @@ export default function App() {
               <h3>R$ 134,90/mês</h3>
               <p>Economia de R$ 102,60 por mês comparando com os serviços avulsos.</p>
 
-              <button onClick={handleWhatsappClick}>ASSINAR PELO WHATSAPP</button>
+              <button onClick={openLeadForm}>ASSINAR PELO WHATSAPP</button>
             </div>
           </div>
 
@@ -297,7 +461,7 @@ export default function App() {
               Economia de mais de R$ 100,00 comparado aos serviços avulsos.
             </div>
 
-            <button className="cta" onClick={handleWhatsappClick}>
+            <button className="cta" onClick={openLeadForm}>
               <IoLogoWhatsapp /> ASSINAR PELO WHATSAPP
             </button>
           </div>

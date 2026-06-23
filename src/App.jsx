@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 
 import "./App.css";
 
@@ -9,143 +9,141 @@ import sky from "../public/imgs/sky-plus.png";
 import prime from "../public/imgs/prime-video.png";
 import disney from "../public/imgs/disney-plus.png";
 
-import capas from "../public/logos/image.png"; // logos dos apps aqui 
+import capas from "../public/logos/image.png"; // logos dos apps aqui
 import { IoAdd, IoLogoWhatsapp } from "react-icons/io5";
 
 const PLAN_NAME = "Plano Familia Netbox";
-const emptyLeadForm = {
-  name: "",
-  phone: "",
-  city: "",
-};
+
+function readReferralCode() {
+  const params = new URLSearchParams(window.location.search);
+  const code =
+    params.get("ref") ||
+    params.get("shortCode") ||
+    params.get("link");
+
+  if (code) {
+    sessionStorage.setItem("netboxReferralCode", code);
+    return code;
+  }
+
+  return sessionStorage.getItem("netboxReferralCode") || "";
+}
 
 export default function App() {
-  const [isLeadFormOpen, setIsLeadFormOpen] = useState(false);
-  const [leadForm, setLeadForm] = useState(emptyLeadForm);
-  const [leadError, setLeadError] = useState("");
-  const nameInputRef = useRef(null);
+  const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
+  const [referralCode, setReferralCode] = useState(() => readReferralCode());
+  const [copyStatus, setCopyStatus] = useState("");
+  const [whatsappStatus, setWhatsappStatus] = useState("");
 
   const apiBaseUrl =
     import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
   const whatsappNumber = String(
     import.meta.env.VITE_WHATSAPP_NUMBER || ""
   ).replace(/\D/g, "");
-  const whatsappFallbackUrl = whatsappNumber
-    ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
-        `Tenho interesse no ${PLAN_NAME}.`
-      )}`
-    : "";
 
   function getReferralCode() {
-    const params = new URLSearchParams(window.location.search);
-    const code =
-      params.get("ref") ||
-      params.get("shortCode") ||
-      params.get("link");
+    const code = referralCode || readReferralCode();
+    setReferralCode(code);
+    return code;
+  }
 
-    if (code) {
-      sessionStorage.setItem("netboxReferralCode", code);
-      return code;
+  async function copyReferralCode() {
+    const code = getReferralCode();
+
+    if (!code) {
+      setCopyStatus("Codigo nao identificado");
+      window.setTimeout(() => setCopyStatus(""), 2200);
+      return;
     }
 
-    return sessionStorage.getItem("netboxReferralCode");
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopyStatus("Codigo copiado");
+    } catch {
+      setCopyStatus("Copie manualmente");
+    }
+
+    window.setTimeout(() => setCopyStatus(""), 2200);
   }
 
-  function openLeadForm() {
-    setLeadError("");
-    setIsLeadFormOpen(true);
-    window.setTimeout(() => nameInputRef.current?.focus(), 0);
+  function openPromoModal() {
+    getReferralCode();
+    setWhatsappStatus("");
+    setIsPromoModalOpen(true);
   }
 
-  function closeLeadForm() {
-    setIsLeadFormOpen(false);
-    setLeadError("");
+  function closePromoModal() {
+    setIsPromoModalOpen(false);
+    setWhatsappStatus("");
   }
 
-  function handleLeadFieldChange(event) {
-    const { name, value } = event.target;
-
-    setLeadForm((currentLeadForm) => ({
-      ...currentLeadForm,
-      [name]: value,
-    }));
+  function handleOverlayClick(event) {
+    if (event.target === event.currentTarget) {
+      closePromoModal();
+    }
   }
 
-  function buildWhatsappFallbackUrl(leadValues) {
+  function buildWhatsappUrl() {
     if (!whatsappNumber) {
       return "";
     }
 
-    const message = leadValues
-      ? [
-          `Tenho interesse no ${PLAN_NAME}.`,
-          `Nome: ${leadValues.name}`,
-          `WhatsApp: ${leadValues.phone}`,
-          `Cidade: ${leadValues.city}`,
-        ].join("\n")
-      : `Tenho interesse no ${PLAN_NAME}.`;
+    const code = getReferralCode();
+    const message = [
+      `Tenho interesse no ${PLAN_NAME}.`,
+      code ? `Codigo do afiliado: ${code}` : "",
+      code ? "Quero garantir a promocao vinculada a esse codigo." : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
 
     return `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
       message
     )}`;
   }
 
-  function handleLeadSubmit(event) {
-    event.preventDefault();
+  async function handleWhatsappClick() {
+    const code = getReferralCode();
+    const fallbackUrl = buildWhatsappUrl();
 
-    const nextLeadForm = {
-      name: leadForm.name.trim(),
-      phone: leadForm.phone.replace(/\D/g, ""),
-      city: leadForm.city.trim(),
-    };
-
-    if (
-      !nextLeadForm.name ||
-      nextLeadForm.phone.length < 10 ||
-      !nextLeadForm.city
-    ) {
-      setLeadError("Preencha nome, WhatsApp e cidade para continuar.");
+    if (!whatsappNumber) {
+      alert("Numero de WhatsApp nao configurado.");
       return;
     }
 
-    handleWhatsappClick(nextLeadForm);
-  }
-
-  function handleOverlayClick(event) {
-    if (event.target === event.currentTarget) {
-      closeLeadForm();
+    if (!code) {
+      window.location.href = fallbackUrl;
+      return;
     }
-  }
 
-  function handleWhatsappClick(leadValues) {
-    const referralCode = getReferralCode();
+    const trackingUrl = new URL(`/links/${code}/whatsapp`, apiBaseUrl);
+    trackingUrl.searchParams.set("product", PLAN_NAME);
+    trackingUrl.searchParams.set("source", "landing-page-whatsapp-modal");
 
-    if (!referralCode) {
-      const fallbackUrl = buildWhatsappFallbackUrl(leadValues);
+    setWhatsappStatus("Abrindo WhatsApp...");
 
-      if (!fallbackUrl && !whatsappFallbackUrl) {
-        alert("Link de divulgação não identificado.");
-        return;
+    try {
+      const response = await fetch(trackingUrl.toString(), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          product: PLAN_NAME,
+          source: "landing-page-whatsapp-modal",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Nao foi possivel registrar o clique no WhatsApp.");
       }
 
-      window.location.href = fallbackUrl || whatsappFallbackUrl;
-      return;
+      const data = await response.json();
+      window.location.href = data.destination || fallbackUrl;
+    } catch (error) {
+      console.error("Erro ao registrar clique no WhatsApp:", error);
+      window.location.href = fallbackUrl || trackingUrl.toString();
     }
-
-    const url = new URL(
-      `/links/${referralCode}/whatsapp`,
-      apiBaseUrl
-    );
-    url.searchParams.set("product", PLAN_NAME);
-
-    if (leadValues) {
-      url.searchParams.set("visitorName", leadValues.name);
-      url.searchParams.set("visitorPhone", leadValues.phone);
-      url.searchParams.set("visitorCity", leadValues.city);
-      url.searchParams.set("source", "landing-page");
-    }
-
-    window.location.href = url.toString();
   }
 
   return (
@@ -173,79 +171,81 @@ export default function App() {
           geram economia de verdade?
         </h1>
 
-        <button className="cta" onClick={openLeadForm}>
+        {referralCode && (
+          <div className="referral-card">
+            <span>Codigo do afiliado</span>
+            <strong>{referralCode}</strong>
+            <p>
+              Copie este codigo e informe no WhatsApp para garantir a promocao
+              vinculada ao afiliado.
+            </p>
+            <button type="button" onClick={copyReferralCode}>
+              {copyStatus || "Copiar codigo"}
+            </button>
+          </div>
+        )}
+
+        <button className="cta" onClick={openPromoModal}>
           QUERO CONHECER O PLANO
         </button>
       </section>
 
-      {isLeadFormOpen && (
+      {isPromoModalOpen && (
         <div
           className="lead-overlay"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="lead-form-title"
+          aria-labelledby="promo-modal-title"
           onClick={handleOverlayClick}
         >
-          <div className="lead-form-card">
+          <div className="lead-form-card promo-modal-card">
             <button
               className="lead-close"
               type="button"
-              aria-label="Fechar formulario"
-              onClick={closeLeadForm}
+              aria-label="Fechar aviso"
+              onClick={closePromoModal}
             >
               X
             </button>
 
             <span className="lead-kicker">Plano Familia Netbox</span>
-            <h2 id="lead-form-title">Quero conhecer o plano</h2>
+            <h2 id="promo-modal-title">Garanta sua promocao pelo WhatsApp</h2>
 
-            <form className="lead-form" onSubmit={handleLeadSubmit}>
-              <label>
-                Nome completo
-                <input
-                  ref={nameInputRef}
-                  type="text"
-                  name="name"
-                  autoComplete="name"
-                  value={leadForm.name}
-                  onChange={handleLeadFieldChange}
-                />
-              </label>
+            <p className="promo-modal-description">
+              Para garantir a promocao do afiliado, copie o codigo abaixo ou
+              clique no botao do WhatsApp. A mensagem ja sera enviada com o
+              codigo preenchido.
+            </p>
 
-              <label>
-                WhatsApp
-                <input
-                  type="tel"
-                  name="phone"
-                  inputMode="tel"
-                  autoComplete="tel"
-                  placeholder="(63) 99999-9999"
-                  value={leadForm.phone}
-                  onChange={handleLeadFieldChange}
-                />
-              </label>
-
-              <label>
-                Cidade
-                <input
-                  type="text"
-                  name="city"
-                  autoComplete="address-level2"
-                  value={leadForm.city}
-                  onChange={handleLeadFieldChange}
-                />
-              </label>
-
-              {leadError && (
-                <p className="lead-error" role="alert">
-                  {leadError}
-                </p>
-              )}
-
-              <button className="lead-submit" type="submit">
-                <IoLogoWhatsapp /> ENVIAR E CONTINUAR
+            <div className="lead-referral-box promo-code-box">
+              <span>Codigo do afiliado</span>
+              <strong>{referralCode || "Nao identificado"}</strong>
+              <button type="button" onClick={copyReferralCode}>
+                {copyStatus || "Copiar codigo"}
               </button>
-            </form>
+            </div>
+
+            <div className="promo-modal-warning">
+              <strong>Importante:</strong>
+              <p>
+                Ao falar com o atendente, mantenha o codigo na mensagem para
+                que a promocao seja vinculada corretamente.
+              </p>
+            </div>
+
+            {whatsappStatus && (
+              <p className="promo-status" role="status">
+                {whatsappStatus}
+              </p>
+            )}
+
+            <button
+              className="lead-submit promo-whatsapp-button"
+              type="button"
+              onClick={handleWhatsappClick}
+            >
+              <IoLogoWhatsapp /> CONTINUAR PELO WHATSAPP
+            </button>
           </div>
         </div>
       )}
@@ -394,7 +394,7 @@ export default function App() {
               <h3>R$ 134,90/mês</h3>
               <p>Economia de R$ 102,60 por mês comparando com os serviços avulsos.</p>
 
-              <button onClick={openLeadForm}>ASSINAR PELO WHATSAPP</button>
+              <button onClick={openPromoModal}>ASSINAR PELO WHATSAPP</button>
             </div>
           </div>
 
@@ -461,7 +461,7 @@ export default function App() {
               Economia de mais de R$ 100,00 comparado aos serviços avulsos.
             </div>
 
-            <button className="cta" onClick={openLeadForm}>
+            <button className="cta" onClick={openPromoModal}>
               <IoLogoWhatsapp /> ASSINAR PELO WHATSAPP
             </button>
           </div>
